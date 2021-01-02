@@ -1,6 +1,5 @@
 {
   "button": 4,
-  "speaker": 21,
   "ir": {
     "left": 12,
     "right": 16
@@ -32,6 +31,9 @@
   "servo": {
     "backlight": {
       "channel": 15
+    },
+    "speaker": {
+      "channel": 0
     },
     "freq": 60,
     "head": {

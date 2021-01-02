@@ -1,6 +1,6 @@
 import asyncio, time
 from collections import Iterable
-from gpiozero import Motor, Button, LineSensor, DigitalOutputDevice#, TonalBuzzer, DistanceSensor
+from gpiozero import Motor, Button, LineSensor#, TonalBuzzer, DistanceSensor
 from .distance_sensor import DistanceSensor
 from gpiozero.tones import Tone
 from .rcute_servokit import ServoKit
@@ -46,8 +46,8 @@ class CozmarsServer:
         self.button.when_held = cb('held', self.button, 'is_held')
         self.sonar.when_in_range = cb('in_range', self.sonar, 'distance')
         self.sonar.when_out_of_range = cb('out_of_range', self.sonar, 'distance')
-        self.screen.clear()
-        self._screen_backlight(.05)
+        self.screen.fill(0)
+        self._screen_backlight(.01)
 
         return self
 
@@ -56,6 +56,7 @@ class CozmarsServer:
         for a in [self.sonar, self.lir, self.rir, self.lmotor, self.rmotor, self.cam]:
             a and a.close()
         self._screen_backlight(None)
+        self._speaker_power(None)
         self.lock.release()
 
     def __del__(self):
@@ -75,7 +76,6 @@ class CozmarsServer:
 
         self.button = Button(self.conf['button'])
         self._double_press_max_interval = .5
-        self.speaker_power = DigitalOutputDevice(self.conf['speaker'])
         self.cam = None
 
         spi = board.SPI()
@@ -92,8 +92,12 @@ class CozmarsServer:
         try: # the try-catch is for testing the server without servo driver connected
             self.servokit = ServoKit(channels=16, freq=self.conf['servo']['freq'])
             self.screen_backlight = self.servokit.servo[self.conf['servo']['backlight']['channel']]
-            self.screen_backlight.set_pulse_width_range(0, 100000//self.conf['servo']['freq'])
+            self.screen_backlight.set_pulse_width_range(0, 1000000//self.conf['servo']['freq'])
             self.screen_backlight.fraction = 0
+
+            self.speaker_power = self.servokit.servo[self.conf['servo']['speaker']['channel']]
+            self.speaker_power.set_pulse_width_range(0, 1000000//self.conf['servo']['freq'])
+            self.speaker_power.fraction = 0
 
             self.servo_update_rate = self.conf['servo']['update_rate']
             self.reset_servos()
@@ -285,7 +289,40 @@ class CozmarsServer:
             self.screen_backlight.fraction = b
 
     async def backlight(self, *args):
-        self.screen.backlight(args)
+        return await self._servo(self.screen_backlight, *args)
+
+    def _speaker_power(self, b):
+        if hasattr(self, 'servokit'):
+            self.speaker_power.fraction = b
+
+    async def _servo(self, servo, *args):
+        if not args:
+            return servo.fraction or 0
+        value = args[0]
+        duration = speed = None
+        try:
+            duration = args[1]
+            speed = args[2]
+        except IndexError:
+            pass
+        if not (duration or speed):
+            servo.fraction = value or 0
+            return
+        elif speed:
+            if not 0 < speed <= 1 * self.servo_update_rate:
+                raise ValueError(f'Speed must be 0 ~ {1*self.servo_update_rate}')
+            duration = (value - servo.fraction)/speed
+        steps = int(duration * self.servo_update_rate)
+        interval = 1/self.servo_update_rate
+        try:
+            inc = (value-servo.fraction)/steps
+            for _ in range(steps):
+                await asyncio.sleep(interval)
+                servo.fraction += inc
+        except (ZeroDivisionError, ValueError):
+            pass
+        finally:
+            servo.fraction = value
 
     def relax_lift(self):
         self.larm.relax()
@@ -512,7 +549,7 @@ class CozmarsServer:
 
         def fcb():
             self.mic_int = False
-            self.speaker_power.off()
+            self._speaker_power(None)
             loop.call_soon_threadsafe(done_ev.set)
 
         zeros = None
@@ -538,7 +575,7 @@ class CozmarsServer:
 
         self.mic_int = True
         async with self.i2s_lock:
-            self.speaker_power.on()
+            self._speaker_power(1)
             with sd.RawOutputStream(callback=cb, dtype=dtype, samplerate=samplerate, channels=1, blocksize=blocksize, finished_callback=fcb):
                 await done_ev.wait()
 
