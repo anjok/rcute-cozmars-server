@@ -1,6 +1,6 @@
 import asyncio, time
 from collections.abc import Iterable
-from gpiozero import Motor, Button, LineSensor#, TonalBuzzer, DistanceSensor
+from gpiozero import Button, LineSensor#, TonalBuzzer, DistanceSensor
 from .distance_sensor import DistanceSensor
 from gpiozero.tones import Tone
 from .rcute_servokit import ServoKit
@@ -46,8 +46,8 @@ class CozmarsServer:
         self.button.when_held = cb('held', self.button, 'is_held')
         self.sonar.when_in_range = cb('in_range', self.sonar, 'distance')
         self.sonar.when_out_of_range = cb('out_of_range', self.sonar, 'distance')
-        self.screen.fill(0)
-        self._screen_backlight(.01)
+        self.screen.clear()
+        self.screen.backlight_brightness = .05
 
         return self
 
@@ -55,7 +55,7 @@ class CozmarsServer:
         self.stop_all_motors()
         for a in [self.sonar, self.lir, self.rir, self.lmotor, self.rmotor, self.cam]:
             a and a.close()
-        self._screen_backlight(None)
+        self.screen.backlight_brightness = None
         self._speaker_power(None)
         self.lock.release()
 
@@ -77,18 +77,6 @@ class CozmarsServer:
         self.button = Button(self.conf['button'])
         self._double_press_max_interval = .5
         self.cam = None
-
-        spi = board.SPI()
-        cs_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["cs"]}'))
-        dc_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["dc"]}'))
-        reset_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["rst"]}'))
-        self.screen = st7789.ST7789(spi, rotation=90, width=135, height=240, x_offset=53, y_offset=40,
-            cs=cs_pin,
-            dc=dc_pin,
-            rst=reset_pin,
-            baudrate=24000000,
-        )
-
         try: # the try-catch is for testing the server without servo driver connected
             self.servokit = ServoKit(channels=16, freq=self.conf['servo']['freq'])
             self.screen_backlight = self.servokit.servo[self.conf['servo']['backlight']['channel']]
@@ -107,6 +95,7 @@ class CozmarsServer:
             self.relax_head()
         except Exception as e:
             print(e)
+        self.screen = Display(self.servokit, self.conf)
 
     @staticmethod
     def conf_servo(servokit, conf):
