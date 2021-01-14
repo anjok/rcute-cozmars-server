@@ -1,25 +1,23 @@
 import asyncio, time
 from collections import Iterable
-from gpiozero import Motor, Button, TonalBuzzer, LineSensor#, DistanceSensor
+from gpiozero import Button, TonalBuzzer, LineSensor#, DistanceSensor
 from .distance_sensor import DistanceSensor
 from gpiozero.tones import Tone
 from .rcute_servokit import ServoKit
+from .rcute_display import Display
+from .rcute_motor import Motor
 from . import util
-
-import board
-import digitalio
-import adafruit_rgb_display.st7789 as st7789
-from adafruit_rgb_display.rgb import color565
 
 import json
 
 from wsmprpc import RPCStream
 
 class CozmarsServer:
+
     async def __aenter__(self):
         await self.lock.acquire()
-        self.lmotor = Motor(*self.conf['motor']['left'])
-        self.rmotor = Motor(*self.conf['motor']['right'])
+        self.lmotor = Motor(self.servokit, *self.conf, 'left')
+        self.rmotor = Motor(self.servokit, *self.conf, 'right')
         # self.reset_servos()
         self.reset_motors()
         self.lir = LineSensor(self.conf['ir']['left'], queue_len=3, sample_rate=10, pull_up=True)
@@ -48,8 +46,8 @@ class CozmarsServer:
         self.button.when_held = cb('held', self.button, 'is_held')
         self.sonar.when_in_range = cb('in_range', self.sonar, 'distance')
         self.sonar.when_out_of_range = cb('out_of_range', self.sonar, 'distance')
-        self.screen.fill(0)
-        self.screen_backlight.fraction = .05
+        self.screen.clear()
+        self.screen.backlight_brightness = .05
 
         return self
 
@@ -58,7 +56,7 @@ class CozmarsServer:
         self.buzzer.stop()
         for a in [self.sonar, self.lir, self.rir, self.lmotor, self.rmotor, self.cam]:
             a and a.close()
-        self.screen_backlight.fraction = None
+        self.screen.backlight_brightness = None
         self.lock.release()
 
     def __del__(self):
@@ -79,20 +77,7 @@ class CozmarsServer:
         self.buzzer = TonalBuzzer(self.conf['buzzer'])
 
         self.servokit = ServoKit(channels=16, freq=self.conf['servo']['freq'])
-
-        self.screen_backlight = self.servokit.servo[self.conf['servo']['backlight']['channel']]
-        self.screen_backlight.set_pulse_width_range(0, 100000//self.conf['servo']['freq'])
-        self.screen_backlight.fraction = 0
-        spi = board.SPI()
-        cs_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["cs"]}'))
-        dc_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["dc"]}'))
-        reset_pin = digitalio.DigitalInOut(getattr(board, f'D{self.conf["screen"]["rst"]}'))
-        self.screen = st7789.ST7789(spi, rotation=90, width=135, height=240, x_offset=53, y_offset=40,
-            cs=cs_pin,
-            dc=dc_pin,
-            rst=reset_pin,
-            baudrate=24000000,
-        )
+        self.screen = Display(self.servokit, self.conf)
         self.servo_update_rate = self.conf['servo']['update_rate']
         self._double_press_max_interval = .5
         self.reset_servos()
@@ -197,33 +182,7 @@ class CozmarsServer:
         self.relax_head()
 
     async def backlight(self, *args):
-        if not args:
-            return self.screen_backlight.fraction or 0
-        value = args[0]
-        duration = speed = None
-        try:
-            duration = args[1]
-            speed = args[2]
-        except IndexError:
-            pass
-        if not (duration or speed):
-            self.screen_backlight.fraction = value or 0
-            return
-        elif speed:
-            if not 0 < speed <= 1 * self.servo_update_rate:
-                raise ValueError(f'Speed must be 0 ~ {1*self.servo_update_rate}')
-            duration = (value - self.screen_backlight.fraction)/speed
-        steps = int(duration * self.servo_update_rate)
-        interval = 1/self.servo_update_rate
-        try:
-            inc = (value-self.screen_backlight.fraction)/steps
-            for _ in range(steps):
-                await asyncio.sleep(interval)
-                self.screen_backlight.fraction += inc
-        except (ZeroDivisionError, ValueError):
-            pass
-        finally:
-            self.screen_backlight.fraction = value
+        self.screen.backlight(args)
 
     def relax_lift(self):
         self.larm.relax()
@@ -306,12 +265,12 @@ class CozmarsServer:
             self._head.angle = angle
 
     def display(self, image_data, x, y, x1, y1):
-        self.screen._block(x, y, x1, y1, image_data)
+        self.screen.display(image_data, x, y, x1, y1)
 
     def fill(self, color565, x, y, w, h):
-        self.screen.fill_rectangle(x, y, w, h, color565)
+        self.screen.fill(color565, x, y, w, h)
 
-    def pixel(self, x, y, color565):
+    def pixel(self, color565, x, y):
         return self.screen.pixel(x, y, color565)
 
     def gif(self, gif, loop):

@@ -77,7 +77,7 @@ class Servo:
     def fraction(self):
         """Pulse width expressed as fraction between 0.0 (`min_pulse`) and 1.0 (`max_pulse`).
         For conventional servos, corresponds to the servo position as a fraction
-        of the actuation range. Is None when servo is diabled (pulsewidth of 0ms).
+        of the actuation range. Is None when servo is disabled (pulsewidth of 0ms).
         """
         if self._pwm_out.duty_cycle == 0 and self._min_duty != 0:  # Special case for disabled servos
             return self._last_fraction

@@ -34,7 +34,7 @@
     },
     "freq": 60,
     "head": {
-      "channel": 10,
+      "channel": 11,
       "max_pulse": 1800,
       "min_pulse": 1350
     },
@@ -44,7 +44,17 @@
       "min_pulse": 2070
     },
     "right_arm": {
-      "channel": 11,
+      "channel": 10,
+      "max_pulse": 920,
+      "min_pulse": 490
+    },
+    "right_motor": {
+      "channel": 1,
+      "max_pulse": 920,
+      "min_pulse": 490
+    },
+    "left_motor": {
+      "channel": 0,
       "max_pulse": 920,
       "min_pulse": 490
     },

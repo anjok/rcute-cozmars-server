@@ -13,22 +13,22 @@ parsed_template = util.parsed_template
 async def dim_screen(sec):
     global cozmars_rpc_server
     await asyncio.sleep(sec)
-    cozmars_rpc_server.screen_backlight.fraction = None
+    cozmars_rpc_server.screen.backlight_brightness = None
 
 def lightup_screen(sec):
     global cozmars_rpc_server, dim_screen_task, server_loop
     dim_screen_task and server_loop.call_soon_threadsafe(dim_screen_task.cancel)
-    cozmars_rpc_server.screen_backlight.fraction = .1
+    cozmars_rpc_server.screen.backlight_brightness = .1
     dim_screen_task = asyncio.run_coroutine_threadsafe(dim_screen(5), server_loop)
 
 async def delay_check_call(sec, cmd):
     await asyncio.sleep(sec)
-    cozmars_rpc_server.screen_backlight.fraction = 0
+    cozmars_rpc_server.screen.backlight_brightness = 0
     check_call(cmd.split(' '))
 
 async def button_poweroff():
     cozmars_rpc_server.screen.image(util.poweroff_screen())
-    cozmars_rpc_server.screen_backlight.fraction = .1
+    cozmars_rpc_server.screen.backlight_brightness = .1
     cozmars_rpc_server.buzzer.play('A4')
     await asyncio.sleep(.3)
     cozmars_rpc_server.buzzer.stop()
@@ -108,14 +108,14 @@ def restart_server(request):
 @app.route('/poweroff')
 def poweroff(request):
     cozmars_rpc_server.screen.image(util.poweroff_screen())
-    cozmars_rpc_server.screen_backlight.fraction = .1
+    cozmars_rpc_server.screen.backlight_brightness = .1
     asyncio.create_task(delay_check_call(5, 'sudo poweroff'))
     return sanic.response.html("""<p>{}<br> {}</p>""".format(_("Shutting down"), _("Please wait for the power light in the head of the Cozmars robot to go out before pressing the power button on the side.")))
 
 @app.route('/reboot')
 def reboot(request):
     cozmars_rpc_server.screen.image(util.reboot_screen())
-    cozmars_rpc_server.screen_backlight.fraction = .1
+    cozmars_rpc_server.screen.backlight_brightness = .1
     asyncio.create_task(delay_check_call(5, 'sudo reboot'))
     return sanic.response.html(redirect_html(60, '/', """<p>{}... </p> <p>{}</p>""".format({_("Rebooting")}, _("This takes about a minute"))))
 
@@ -175,5 +175,5 @@ def upgrade(request):
     return sanic.response.stream(streaming_fn, content_type='text/html; charset=utf-8')
 
 # if __name__ == "__main__":
-app.run(host="0.0.0.0", port=80, debug=False)
+app.run(host="0.0.0.0", port=8080, debug=False)
 # app.run(host="0.0.0.0", port=80)
