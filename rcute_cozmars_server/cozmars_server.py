@@ -95,7 +95,7 @@ class CozmarsServer:
             self.relax_head()
         except Exception as e:
             print(e)
-        self.screen = Display(self.servokit, self.conf)
+        self.screen = Screen(self.servokit, self.conf)
 
     @staticmethod
     def conf_servo(servokit, conf):

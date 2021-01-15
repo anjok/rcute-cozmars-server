@@ -155,6 +155,8 @@ class Screen:
 
     def clear(self):
         self.fill(0, 0, 0, self.width, self.height)
+    def clear(self):
+        self.fill(0, 0, 0, self.screen.width, self.screen.height)
 
     def image(self, image):
         self.screen.show_image(image)
