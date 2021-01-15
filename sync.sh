@@ -1,1 +1,1 @@
-rsync -e ssh -avz ./ cozmo:rcute-cozmars-server/
+rsync -e ssh -avz ./ cozmo:server/

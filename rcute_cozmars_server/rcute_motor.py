@@ -8,17 +8,16 @@ class ServoMotor:
         self.conf = conf
         self.key = key
         self.channel = servokit.pca.channels[self.conf['channel']]
-        print(f"motor_conf_{key}={conf}")
         self.motor = adafruit_motor.servo.ContinuousServo(self.channel, min_pulse=self.conf['min_pulse'], max_pulse=self.conf['max_pulse'])
 
     @property
     def value(self):
-        return -self.motor.throttle
+        return self.motor.throttle
 
     @value.setter
     def value(self, value):
-        print(f"motor_{self.key}={value:.03f}")
-        self.motor.throttle = -value
+        print(f"set motor_{self.key}={value:.03f}")
+        self.motor.throttle = value
 
     def close(self):
         self.motor.value = 0

@@ -1,15 +1,12 @@
+import RPi.GPIO as GPIO
 import time
 import threading
 
 class DistanceSensor:
     def __init__(self, trigger, echo, max_distance, threshold_distance, inverval=.1, **kw):
-        try:
-            import RPi.GPIO as GPIO
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(trigger, GPIO.OUT)
-            GPIO.setup(echo, GPIO.IN)
-        except e:
-            pass
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(trigger, GPIO.OUT)
+        GPIO.setup(echo, GPIO.IN)
         self.trigger = trigger
         self.echo = echo
         self.max_distance = max_distance

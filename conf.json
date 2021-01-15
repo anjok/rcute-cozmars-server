@@ -51,13 +51,13 @@
     },
     "right_motor": {
       "channel": 1,
-      "max_pulse": 920,
-      "min_pulse": 490
+      "max_pulse": 2000,
+      "min_pulse": 1000
     },
     "left_motor": {
       "channel": 0,
-      "max_pulse": 920,
-      "min_pulse": 490
+      "max_pulse": 2000,
+      "min_pulse": 1000
     },
     "update_rate": 20
   },

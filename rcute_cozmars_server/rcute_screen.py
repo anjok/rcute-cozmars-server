@@ -18,7 +18,26 @@ class OledScreen:
         self.draw = ImageDraw.Draw(self.image)
 
     def display(self, image_data, x, y, x1, y1):
-        self.screen._block(x, y, x1, y1, image_data)
+        class numpy_holder(object):
+            pass
+        def createMatrix(rowCount, colCount, dataList):   
+            mat = []
+            for i in range (rowCount):
+                rowList = []
+                for j in range (colCount):
+                    if dataList[j] not in mat:
+                        rowList.append(1 if dataList[j] else 0)
+                mat.append(rowList)
+            #holder = numpy_holder()
+            mat.__array_interface__ = {"shape":[colCount, rowCount]}
+            return mat 
+
+        cols = x1-x
+        rows = y1-y
+        arr = createMatrix(rows, cols, image_data)
+        image = Image.fromarray(arr)
+        print(f"image pos={x}, {y}, {x1}, {y1} data={image_data}")
+        self.show_image(x, y, x1, y1, image)
 
     def show_image(self, image):
         self.screen.image(image.convert("1").resize((self.screen.width, self.screen.height)))
