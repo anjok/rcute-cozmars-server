@@ -126,8 +126,16 @@ class Screen:
     def display(self, image_data, x, y, x1, y1):
         self.screen.display(image_data, x, y, x1, y1)
 
+    @property
+    def width(self):
+        return self.screen.screen.width
+
+    @property
+    def height(self):
+        return self.screen.screen.height
+
     def clear(self):
-        self.fill(0, 0, 0, self.screen.width, self.screen.height)
+        self.fill(0, 0, 0, self.width, self.height)
 
     def image(self, image):
         self.screen.show_image(image)

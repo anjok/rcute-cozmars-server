@@ -19,6 +19,10 @@ class ServoKit:
     def servos(self):
         return self._servos
 
+    @property
+    def pca(self):
+        return self._pca
+
 class _Servos:
     def __init__(self, kit):
         self.kit = kit

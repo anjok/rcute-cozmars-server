@@ -138,39 +138,87 @@ class CozmarsServer:
         with open(env_path, 'w') as f:
             json.dump(self.env, f, indent=2)
 
+    def motor_compensate_speed(self, speed, i):
+        return self.motor_compensate['forward' if speed>0 else 'backward'][i]
+
+    def motor_adjust_speed(self, speed, inverse):
+        self.motor_min_value=0.2
+        min_value = self.motor_min_value
+        actual_min_value = (min_value if speed>0 else -min_value)
+        if inverse:
+            return (speed-(actual_min_value))/(1.0 - min_value) if speed else 0
+        return speed*(1-min_value) + actual_min_value if speed else 0
+
     def real_speed(self, sp):
         '''
         1. compensate for speed inbalance of two motors
         2. the motors won't run when speed is lower than .2,
             so we map speed from (0, 1] => (.2, 1], (0, -1] => (-.2, -1] and 0 => 0
         '''
-        if not isinstance(sp, Iterable):
-            sp = (sp, sp)
-        sp = (s*self.motor_compensate['forward' if s>0 else 'backward'][i] for i, s in enumerate(sp))
-        return tuple((s*.8 + (.2 if s>0 else -.2) if s else 0) for s in sp)
+        for i, s in enumerate(sp):
+            s = s if s < 1 else 1
+            s if s > -1 else -1
+            s = s*self.motor_compensate_speed(s, i)
+            s = self.motor_adjust_speed(s,False) if s else 0
+            sp[i] = s
+        return sp
+
+    def mapped_single_speed(self, speed, i):
+        # real speed -> mapped speed
+        # if abs(speed)) < .2 too small, remap
+        adjusted = self.motor_adjust_speed(speed, True)
+        comp = self.motor_compensate_speed(adjusted, i)
+        res = max(-1, min(1, adjusted/comp))
+        return res
 
     def mapped_speed(self, sp):
         # real speed -> mapped speed
         if not isinstance(sp, Iterable):
             sp = (sp, sp)
-        sp = (((s-((.2 if s>0 else -.2)))/.8 if s else 0) for s in sp)
-        return tuple(max(-1, min(1, s/self.motor_compensate['forward' if s>0 else 'backward'][i])) for i, s in enumerate(sp))
+        return tuple((self.mapped_single_speed(s,i)) for i, s in enumerate(sp))
 
     async def speed(self, speed=None, duration=None):
         if speed is None:
             return self.mapped_speed((self.lmotor.value, self.rmotor.value))
+        if not isinstance(speed, Iterable):
+            speed = (speed, speed)
+        print(f"raw={(self.lmotor.value, self.rmotor.value)} should={speed} ")
+        print(f"actual_should={self.real_speed(speed)}")
+        print(f"curr={self.mapped_speed(speed)}")
         speed = self.real_speed(speed)
-        while (self.lmotor.value, self.rmotor.value) != speed:
-            linc = speed[0] - self.lmotor.value
-            if 0< abs(linc) < .3:
-                self.lmotor.value = speed[0]
-            elif linc:
-                self.lmotor.value += .3 if linc> 0 else -.3
-            rinc = speed[1] - self.rmotor.value
-            if 0 < abs(rinc) < .3:
-                self.rmotor.value = speed[1]
-            elif rinc:
-                self.rmotor.value += .3 if rinc> 0 else -.3
+        def set(motor,speed):
+            inc = speed - motor.value
+            if 0 < abs(inc) < .3:
+                motor.value = speed
+            elif inc:
+                motor.value += .3 if inc> 0 else -.3
+        if duration:
+            await asyncio.sleep(duration)
+            await self.speed((0, 0))
+
+    async def speed_(self, speed, duration=None):
+        if speed is None:
+            return self.mapped_speed((self.lmotor.value, self.rmotor.value))
+        print(f"current={(self.lmotor.value, self.rmotor.value)} should={self.mapped_speed(speed)}")
+        speed = self.real_speed(speed)
+        def set_(motor,speed):
+            inc = speed - motor.value
+            if 0 < abs(inc) < .3:
+                motor.value = speed
+                return True
+            elif inc:
+                motor.value += .3 if inc > 0 else -.3
+            return False
+        def set_(motor,speed):
+            motor.value = speed
+            return True
+        done = (False,False)
+        while (True,True) != done:
+            print(f"current={(self.lmotor.value, self.rmotor.value)} should={done}")
+            if set(self.lmotor,speed[0]):
+                done[0] = True
+            if set(self.rmotor,speed[1]):
+                done[1] = True
             await asyncio.sleep(.05)
         if duration:
             await asyncio.sleep(duration)
