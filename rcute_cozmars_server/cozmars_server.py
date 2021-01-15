@@ -4,7 +4,7 @@ from gpiozero import Button, TonalBuzzer, LineSensor#, DistanceSensor
 from .distance_sensor import DistanceSensor
 from gpiozero.tones import Tone
 from .rcute_servokit import ServoKit
-from .rcute_display import Display
+from .rcute_screen import Screen
 from .rcute_motor import Motor
 from . import util
 
@@ -16,8 +16,8 @@ class CozmarsServer:
 
     async def __aenter__(self):
         await self.lock.acquire()
-        self.lmotor = Motor(self.servokit, *self.conf, 'left')
-        self.rmotor = Motor(self.servokit, *self.conf, 'right')
+        self.lmotor = Motor(self.servokit, self.conf, 'left')
+        self.rmotor = Motor(self.servokit, self.conf, 'right')
         # self.reset_servos()
         self.reset_motors()
         self.lir = LineSensor(self.conf['ir']['left'], queue_len=3, sample_rate=10, pull_up=True)
@@ -77,7 +77,7 @@ class CozmarsServer:
         self.buzzer = TonalBuzzer(self.conf['buzzer'])
 
         self.servokit = ServoKit(channels=16, freq=self.conf['servo']['freq'])
-        self.screen = Display(self.servokit, self.conf)
+        self.screen = Screen(self.servokit, self.conf)
         self.servo_update_rate = self.conf['servo']['update_rate']
         self._double_press_max_interval = .5
         self.reset_servos()
@@ -89,7 +89,7 @@ class CozmarsServer:
 
     @staticmethod
     def conf_servo(servokit, conf):
-        servo = servokit.servo[conf['channel']]
+        servo = servokit.servos[conf['channel']]
         servo.set_pulse_width_range(conf['min_pulse'], conf['max_pulse'])
         return servo
 
@@ -122,7 +122,7 @@ class CozmarsServer:
                 s['min_pulse'] = min_pulse
                 s['max_pulse'] = max_pulse
         '''
-        servo = self.servokit.servo[channel]
+        servo = self.servokit.servos[channel]
         servo.set_pulse_width_range(min_pulse or servo.min_pulse, max_pulse or servo.max_pulse)
 
     def get_env(self, name):

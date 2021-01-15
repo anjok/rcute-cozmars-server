@@ -1,27 +1,24 @@
 import gpiozero
-from .cozmars_server import CozmarsServer
+import adafruit_motor.servo
 
-class Motor:
-    def __init__(self, servokit, conf, key):
-        self.conf = conf['servo'][key + 'motor']
-        self.max = self.conf['max']
-        self.min = self.conf['min']
-        self.motor = CozmarsServer.conf_servo(servokit, self.conf)
-        # channel = conf['motor'][key]['servo']
-        # self.motor = gpiozero.Motor(*conf['motor'][key])
+# wrappers around either servo controlled motors or gpiozero.Motor
+
+class ServoMotor:
+    def __init__(self, servokit, conf):
+        self.conf = conf
+        self.channel = servokit.pca.channels[self.conf['channel']]
+        self.motor = adafruit_motor.servo.ContinuousServo(*self.conf)
 
     def close(self):
         self.motor.close()
 
     @property
     def value(self):
-        angle = self.motor.angle
-        return (angle - self.min)/(self.max - self.min)
+        return self.motor.throttle
 
     @value.setter
     def value(self, value):
-        angle = self.min + (self.max - self.min) * value
-        self.motor.angle = angle
+        self.motor.throttle = value
 
 class NormalMotor:
     def __init__(self, servokit, conf, key):
@@ -33,6 +30,25 @@ class NormalMotor:
     @property
     def value(self):
         return self.motor.value
+
+    @value.setter
+    def value(self, value):
+        self.motor.value = value
+
+class Motor:
+    def __init__(self, servokit, conf, key):
+        servo_conf = conf['servo'][key + '_motor']
+        if servo_conf:
+            self.motor = ServoMotor(servokit, servo_conf)
+        else:
+            self.motor = gpiozero.Motor(*conf['motor'][key])
+
+    def close(self):
+        self.motor.close()
+
+    @property
+    def value(self):
+        return self.motor.angle
 
     @value.setter
     def value(self, value):

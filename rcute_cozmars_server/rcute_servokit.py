@@ -13,14 +13,13 @@ class ServoKit:
             i2c, address=address, reference_clock_speed=reference_clock_speed
         )
         self._pca.frequency = freq
-        self._servo = _Servo(self)
+        self._servos = _Servos(self)
 
     @property
-    def servo(self):
-        return self._servo
+    def servos(self):
+        return self._servos
 
-
-class _Servo:
+class _Servos:
     def __init__(self, kit):
         self.kit = kit
 

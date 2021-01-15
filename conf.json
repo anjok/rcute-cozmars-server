@@ -24,6 +24,7 @@
     ]
   },
   "screen": {
+    "type": "oled",
     "cs": 7,
     "dc": 6,
     "rst": 5

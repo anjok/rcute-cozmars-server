@@ -2,27 +2,33 @@ import board
 import busio
 import digitalio
 import asyncio
+
+import adafruit_rgb_display
 import adafruit_rgb_display.st7789 as st7789
 from adafruit_rgb_display.rgb import color565
 
 from PIL import Image, ImageDraw, ImageFont
 import adafruit_ssd1306
 
-
-class Display:
+class OledScreen:
     def __init__(self, servokit, conf):
         i2c = board.I2C()
         self.screen = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-        image = Image.new("1", (self.screen.width, self.screen.height))
-        self.draw = ImageDraw.Draw(image)
-
+        self.image = Image.new("1", (self.screen.width, self.screen.height))
+        self.draw = ImageDraw.Draw(self.image)
 
     def display(self, image_data, x, y, x1, y1):
         self.screen._block(x, y, x1, y1, image_data)
 
-    def image(self, image):
-        #self.draw.image(image)
+    def show_image(self, image):
+        self.screen.image(image.convert("1").resize((self.screen.width, self.screen.height)))
         self.screen.show()
+
+    def image(self, image):
+        self.show_image(image)
+
+    def show(self):
+        self.show_image(self.image)
     
     def clear(self):
         self.fill(0, 0, 0,self.screen.width,self.screen.height)
@@ -30,39 +36,31 @@ class Display:
     def fill(self, color565, x, y, w, h):
         color = 255 if color565 > 0 else 0
         self.draw.rectangle((x, y, w, h), outline=color, fill=color)
-        self.screen.show()
+        self.show()
 
     def pixel(self, x, y, color565):
         color = 255 if color565 > 0 else 0
         return self.screen.pixel(x, y, color)
 
-    def gif(self, gif, loop):
-        #https://github.com/adafruit/Adafruit_CircuitPython_RGB_screen/blob/master/examples/rgb_screen_pillow_animated_gif.py
-        raise NotImplementedError
-
-    def backlight(self, *args):
-        if not args:
-            return 0
     @property
     def backlight_brightness(self):
-        return 0
+        return self._backlight_brightness
 
     @backlight_brightness.setter
     def backlight_brightness(self, value):
-        return 0
+        self._backlight_brightness = value
 
-class ST7789:
+class ST7789Screen:
     def __init__(self, servokit, conf):
-        self.screen_backlight = servokit.servo[conf['servo']['backlight']['channel']]
+        self.screen_backlight = servokit.servos[conf['servo']['backlight']['channel']]
         self.screen_backlight.set_pulse_width_range(0, 100000//conf['servo']['freq'])
         self.servo_update_rate = conf['servo']['update_rate']
-
         self.screen_backlight.fraction = 0
         spi = board.SPI()
         cs_pin = digitalio.DigitalInOut(getattr(board, f'D{conf["screen"]["cs"]}'))
         dc_pin = digitalio.DigitalInOut(getattr(board, f'D{conf["screen"]["dc"]}'))
         reset_pin = digitalio.DigitalInOut(getattr(board, f'D{conf["screen"]["rst"]}'))
-        self.screen = st7789.ST7789(spi, rotation=90, width=135, height=240, x_offset=53, y_offset=40,
+        self.screen = adafruit_rgb_display.st7789.ST7789(spi, rotation=90, width=135, height=240, x_offset=53, y_offset=40,
             cs=cs_pin,
             dc=dc_pin,
             rst=reset_pin,
@@ -78,9 +76,8 @@ class ST7789:
     def pixel(self, x, y, color565):
         return self.screen.pixel(x, y, color565)
 
-    def gif(self, gif, loop):
-        #https://github.com/adafruit/Adafruit_CircuitPython_RGB_screen/blob/master/examples/rgb_screen_pillow_animated_gif.py
-        raise NotImplementedError
+    def image(self, image):
+        self.screen.image(image)
 
     @property
     def backlight_brightness(self):
@@ -118,3 +115,41 @@ class ST7789:
             pass
         finally:
             self.backlight_brightness = value
+
+class Screen:
+    def __init__(self, servokit, conf):
+        if conf['screen']['type'] == 'oled':
+            self.screen = OledScreen(servokit, conf)
+        else:
+            self.screen = ST7789Screen(conf)
+
+    def display(self, image_data, x, y, x1, y1):
+        self.screen.display(image_data, x, y, x1, y1)
+
+    def clear(self):
+        self.fill(0, 0, 0, self.screen.width, self.screen.height)
+
+    def image(self, image):
+        self.screen.show_image(image)
+
+    def fill(self, color565, x, y, w, h):
+        self.screen.fill(color565, x, y, w, h)
+
+    def pixel(self, x, y, color565):
+        return self.screen.pixel(x, y, color565)
+
+    def gif(self, gif, loop):
+        #https://github.com/adafruit/Adafruit_CircuitPython_RGB_screen/blob/master/examples/rgb_screen_pillow_animated_gif.py
+        raise NotImplementedError
+
+    def backlight(self, *args):
+        if not args:
+            return 0
+
+    @property
+    def backlight_brightness(self):
+        return self.screen.backlight_brightness
+
+    @backlight_brightness.setter
+    def backlight_brightness(self, value):
+        self.screen.backlight_brightness = value
