@@ -1,15 +1,26 @@
-from gpiozero import LineSensor
-from signal import pause
 import time
+import board
+import busio
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
-pull_up=True
-left = LineSensor(16,queue_len=3, sample_rate=10, pull_up=pull_up)
-left.when_line = lambda: print('Left detected')
-left.when_no_line = lambda: print('Left not detected')
-right = LineSensor(12,queue_len=3, sample_rate=10, pull_up=pull_up)
-right.when_line = lambda: print('Right detected')
-right.when_no_line = lambda: print('Right not detected')
+# Create the I2C bus
+i2c = busio.I2C(board.SCL, board.SDA)
+
+# Create the ADC object using the I2C bus
+# you can specify an I2C adress instead of the default 0x48
+ads = ADS.ADS1115(i2c, address=0x48)
+
+
+# Create single-ended input on channel 0
+chan0 = AnalogIn(ads, ADS.P0)
+chan1 = AnalogIn(ads, ADS.P1)
+
+# Create differential input between channel 0 and 1
+# chan = AnalogIn(ads, ADS.P0, ADS.P1)
+
+print("{:>5}\t{:>5}".format("raw", "v"))
+
 while True:
-  print("{},{}".format(left.value, right.value))
-  time.sleep(1)
-
+    print("{:>5}:{:>5}\t{:>5.3f}\t{:>5.3f}".format(chan0.value, chan0.value, chan0.voltage, chan1.voltage))
+    time.sleep(0.15)
